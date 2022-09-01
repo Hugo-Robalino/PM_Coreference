@@ -1,55 +1,31 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# # GOLD ANNOTATIONS
-
-# ### Import functions
-
-# In[1]:
-
+# GOLD ANNOTATIONS
+# Import functions
 
 import pandas as pd
 import numpy as np
 import xml.etree.ElementTree as ET
 import re
 
+# File names
 
-# ### File names
-
-# In[2]:
-
-
-file_names = pd.read_csv('gum-master/annis/corpus.annis', delim_whitespace = True, quoting = 3,                    skipfooter = 1, header = None, engine = 'python')[1]
+file_names = pd.read_csv('gum-master/annis/corpus.annis', delim_whitespace = True, quoting = 3, skipfooter = 1, header = None, engine = 'python')[1]
 path_coref_begin = 'gum-master/coref/conll/'
 path_coref_end = '.conll'
 path_text_begin = 'gum-master/paula/GUM/'
 path_text_end = '.text.xml'
 
-
-# ### Coreference annotations
-
-# In[3]:
-
+# Coreference annotations
 
 coref_annotations = {}
 for name in file_names:
-    coref_annotations[name] = pd.read_csv(path_coref_begin + name + path_coref_end,                                                delim_whitespace = True, header=None,                                                quoting=3, skipfooter=2, skiprows=1, engine='python')
+    coref_annotations[name] = pd.read_csv(path_coref_begin + name + path_coref_end, delim_whitespace = True, header=None, quoting=3, skipfooter=2, skiprows=1, engine='python')
 
-
-# ### Creating key files (annotated files) for metrics
-
-# In[6]:
-
-
-#formatting for evaluation metrics
+# Creating key files (annotated files) for metrics
+# formatting for evaluation metrics
 
 for name in file_names:
     coref_annotations[name][2] = coref_annotations[name][2].apply(lambda x: re.sub("[a-zA-Z\-]", "", x))
     coref_annotations[name][2] = coref_annotations[name][2].apply(lambda x: re.sub("_", "-", x))
-
-
-# In[7]:
-
 
 begin_key_file = '# begin document '
 end_key_file = '# end document'
@@ -62,24 +38,15 @@ for name in file_names:
     f.write(end_key_file)
     f.close() 
 
-
-# # COREFERENCE OUTPUT
-
-# ### Import functions
-
-# In[9]:
-
+# COREFERENCE OUTPUT
+# Import functions
 
 import spacy
 from spacy.vocab import Vocab
 from spacy.tokens import Doc
 import neuralcoref
 
-
-# ### Raw texts
-
-# In[ ]:
-
+# Raw texts
 
 texts = {}
 for name in file_names:
@@ -87,14 +54,10 @@ for name in file_names:
     texts[name] = tree.getroot()[1].text
 
 
-# ## NEURAL COREF
-
-# ### Setting up model: en_core_web_lg
-
-# In[10]:
-
-
+# NEURAL COREF
+# Setting up model: en_core_web_lg
 # making custom tokenizer from tokens in annotated data
+
 tokens_dict = {}
 for name in file_names:
     tokens_dict[texts[name]] = list(coref_annotations[name][1])
@@ -111,21 +74,13 @@ nlp.tokenizer = custom_tokenizer
 
 neuralcoref.add_to_pipe(nlp)
 
-
-# ### Create doc object for each raw text
-
-# In[11]:
-
+# Create doc object for each raw text
 
 docs = {}
 for name in file_names:
     docs[name] = nlp(texts[name])
 
-
-# ### Create dataframes for coreference outputs
-
-# In[12]:
-
+# Create dataframes for coreference outputs
 
 coref_output = {}
 for name in file_names:
@@ -139,11 +94,7 @@ for name in file_names:
             rows.append([str(token), '-'] + [np.nan] * 3)
     coref_output[name] = pd.DataFrame(rows, columns=['token', 'coref1', 'coref2', 'coref3', 'coref4'])
 
-
-# ### Conversion dictionaries: from coref chain to number
-
-# In[14]:
-
+# Conversion dictionaries: from coref chain to number
 
 conversions = {}
 for name in file_names:
@@ -152,28 +103,17 @@ for name in file_names:
         conversion_dict[docs[name]._.coref_clusters[i]] = str(i + 1)
     conversions[name] = conversion_dict
 
-
-# In[15]:
-
-
 for name in file_names:
     for col in coref_output[name].columns[1:]:
         coref_output[name][col] = coref_output[name][col].map(conversions[name]).fillna(coref_output[name][col])
 
-
-# ### Joining all chains into one column
-
-# In[16]:
-
+# Joining all chains into one column
 
 for name in file_names:
     coref_output[name]['coref'] = coref_output[name][coref_output[name].columns[1:]].values.tolist()
 
 
-# ### Getting the final format into the column 'f_coref'
-
-# In[17]:
-
+# Getting the final format into the column 'f_coref'
 
 for name in file_names:
     
@@ -218,11 +158,7 @@ for name in file_names:
                 raw_str = '-'
             coref_output[name].loc[i, ('f_coref')] = raw_str
 
-
-# ### Creating response files
-
-# In[20]:
-
+# Creating response files
 
 begin_response_file = '# begin document '
 end_response_file = '# end document'
@@ -235,20 +171,12 @@ for name in file_names:
     f.write(end_response_file)
     f.close() 
 
-
-# # COREF METRICS
-
-# In[31]:
-
+# COREF METRICS
 
 f= open("formatted_files/file_names.txt","w+")
 for name in file_names:
     f.write(name + '\n')
 f.close() 
-
-
-# In[15]:
-
 
 results_lg = {}
 name = ''
@@ -278,10 +206,6 @@ with open("results_en_core_web_lg.txt") as f:
                                         'F1' : float(mentions[14][:-1])}
             search_mentions = False
 
-
-# In[19]:
-
-
 results_sm = {}
 name = ''
 metric = ''
@@ -310,10 +234,6 @@ with open("results_en_core_web_sm.txt") as f:
                                         'F1' : float(mentions[14][:-1])}
             search_mentions = False
 
-
-# In[79]:
-
-
 metrics = ['recall', 'precision', 'F1']
 coref_metrics = ['mentions', 'muc', 'bcub', 'ceafm', 'ceafe']
 
@@ -331,40 +251,20 @@ for name in results_lg.keys():
         for m in metrics:
             rs_lg[name].append(results_lg[name][metric][m])
 
-
-# In[80]:
-
-
 columns = [tuple([c,m]) for c in coref_metrics for m in metrics]
 sm = pd.DataFrame.from_dict(rs_sm, orient = 'index')
 lg = pd.DataFrame.from_dict(rs_lg, orient = 'index')
 sm.columns=pd.MultiIndex.from_tuples(columns)
 lg.columns=pd.MultiIndex.from_tuples(columns)
 
-
-# In[113]:
-
-
 sm_c = sm.rename(lambda x:re.search('_[a-z]*_', x).group()[1:-1], axis ="index")
 lg_c = lg.rename(lambda x:re.search('_[a-z]*_', x).group()[1:-1], axis ="index")
-
-
-# In[121]:
-
 
 sm_mean = sm_c.groupby(by=sm_c.index, axis=0).mean().round(decimals=2)
 lg_mean = lg_c.groupby(by=lg_c.index, axis=0).mean().round(decimals=2)
 
-
-# In[162]:
-
-
 sm_mean_c = sm_mean.append(sm_mean.mean().rename('MEAN').round(decimals=2))
 lg_mean_c = lg_mean.append(lg_mean.mean().rename('MEAN').round(decimals=2))
-
-
-# In[172]:
-
 
 columns_summary = [('MEAN', m) for m in metrics]
 sm_summary = sm_mean_c.groupby(level=1,axis=1).mean().round(decimals=2)
@@ -372,20 +272,11 @@ lg_summary = lg_mean_c.groupby(level=1,axis=1).mean().round(decimals=2)
 sm_summary.columns=pd.MultiIndex.from_tuples(columns_summary)
 lg_summary.columns=pd.MultiIndex.from_tuples(columns_summary)
 
-
-# In[179]:
-
-
 pd.concat([sm_mean_c, sm_summary], axis = 1).to_excel("results_en_core_web_sm.xlsx")
 pd.concat([lg_mean_c, lg_summary], axis = 1).to_excel("results_en_core_web_lg.xlsx")
 
-
-# # CATEGORY ANALYSIS
-
-# ### functions for reading the key and response files and converting them to entity dataframes
-
-# In[527]:
-
+# CATEGORY ANALYSIS
+# functions for reading the key and response files and converting them to entity dataframes
 
 def handle_open(annotation, holder):
     copy_ann = annotation
@@ -443,10 +334,7 @@ def annotation_to_entities(df):
     return pd.DataFrame(entities,columns=['mention','entity','start','end']).sort_values(by=['start','end']) 
 
 
-# ### Coref annotations (key and response)
-
-# In[541]:
-
+# Coref annotations (key and response)
 
 all_coref_paths = {'key' : {'start': 'formatted_files/key_files/', 'end': '.key'},
                   'resp_sm' : {'start': 'formatted_files/response_files/en_core_web_sm/', 'end': '.response'},
@@ -464,11 +352,7 @@ for path in all_coref_paths:
                    skiprows = 1,
                    engine = 'python')
 
-
-# ### Create entities dataframes (key and response)
-
-# In[544]:
-
+# Create entities dataframes (key and response)
 
 entities = {}
 for path in crf_ann:
@@ -476,13 +360,8 @@ for path in crf_ann:
     for name in file_names:
         entities[path][name] = annotation_to_entities(crf_ann[path][name])
 
-
-# # Assigning categories
-
-# ### creating lists of pronouns for categories
-
-# In[639]:
-
+# Assigning categories
+# creating lists of pronouns for categories
 
 definite = ['the']
 demonstrative = ['this', 'that', 'those', 'these', 'here', 'there', 'such', 'none', 'neither']
@@ -498,18 +377,10 @@ speech_pronouns = ['i', 'me', 'my', 'mine', 'myself',
 
 proper_names = []
 
-
-# ### proper names from PENN POS annotations, speech tag = NNP
-
-# In[640]:
-
+# proper names from PENN POS annotations, speech tag = NNP
 
 path_pos_begin = 'gum-master/paula/GUM/'
 path_pos_end = '.tok_penn_pos.xml'
-
-
-# In[666]:
-
 
 temporary_nnp = []
 for name in file_names:
@@ -530,11 +401,7 @@ for name in file_names:
                 hold_nnp = ''
 proper_names = list(set(temporary_nnp))               
 
-
-# ### Actual assigning
-
-# In[667]:
-
+# Actual assigning
 
 for path in entities:
     for name in file_names:
@@ -546,10 +413,6 @@ for path in entities:
                         else 'other'
                         for row in entities[path][name]['mention']]
 
-
-# In[689]:
-
-
 summary = {}
 for path in entities:
     summary[path] = []
@@ -558,17 +421,9 @@ for path in entities:
         summary_series.name = name
         summary[path].append(summary_series)
 
-
-# In[699]:
-
-
 summary_df = {}
 for path in summary:
     summary_df[path] = pd.concat(summary[path], axis=1, keys=[s.name for s in summary[path]], sort = True)
-
-
-# In[741]:
-
 
 summary_sum = {}
 for path in summary_df:
@@ -578,10 +433,6 @@ for path in summary_df:
     temporary = summary_sum[path].copy().append(summary_sum[path].sum().rename('SUM'))
     summary_sum[path] = temporary
     summary_sum[path]['SUM'] = temporary.sum(axis=1) 
-
-
-# In[769]:
-
 
 sum_percent = {}
 summary_cols = ['speech','third','demonstrative','definite', 'proper', 'other']
@@ -595,24 +446,12 @@ for path in summary_sum:
     temp.columns = pd.MultiIndex.from_tuples(multi_col_category)
     sum_percent[path] = temp
 
-
-# In[772]:
-
-
 pd.concat([sum_percent[path] for path in sum_percent], axis=1).to_excel("summary_categories.xlsx")
 
-
-# ### Calculating error mention TP, FN, FP
-
-# In[874]:
-
+# Calculating error mention TP, FN, FP
 
 import datacompy
 categories = ['speech','third','demonstrative','definite', 'proper', 'other']
-
-
-# In[883]:
-
 
 def error_mention(model, name, category, store):
     
@@ -646,10 +485,6 @@ def error_mention(model, name, category, store):
     else:
         store['F1'] = round((2*TP1/(2*TP1 + FP + FN))*100, 2)
 
-
-# In[884]:
-
-
 mention_errors = {}
 for model in ['resp_sm', 'resp_lg']:
     mention_errors[model] = {}
@@ -659,21 +494,9 @@ for model in ['resp_sm', 'resp_lg']:
             mention_errors[model][name][category] = {}
             error_mention(model, name, category, mention_errors[model][name][category])
 
-
-# In[899]:
-
-
 pd.DataFrame.from_dict(mention_errors['resp_sm']['GUM_academic_art']).T[['precision', 'recall', 'F1']].T
 
-
-# In[903]:
-
-
 mention_errors['resp_sm']['GUM_academic_art']['speech']
-
-
-# In[904]:
-
 
 errors = {}
 for path in mention_errors:
@@ -683,11 +506,6 @@ for path in mention_errors:
         for category in categories:
             for measure in ['recall', 'precision', 'F1']:
                 errors[path][name].append(mention_errors[path][name][category][measure])
-        
-
-
-# In[917]:
-
 
 multicolssm = [tuple(['sm',c,m]) for c in categories for m in ['r', 'p', 'f1']]
 multicolslg = [tuple(['lg',c,m]) for c in categories for m in ['r', 'p', 'f1']]
@@ -697,25 +515,10 @@ errors_lg = pd.DataFrame.from_dict(errors['resp_lg']).T
 errors_sm.columns=pd.MultiIndex.from_tuples(multicolssm)
 errors_lg.columns=pd.MultiIndex.from_tuples(multicolslg)
 
-
-# In[928]:
-
-
 comp = pd.concat([errors_sm, errors_lg], axis=1)
 complete = comp.rename(lambda x:re.search('_[a-z]*_', x).group()[1:-1], axis ="index")
 complete_mean = complete.groupby(by=complete.index, axis=0).mean().round(decimals=2)
 complete_mean.T.to_excel("mention_errors_by_categories.xlsx")
 #sm_mean = sm_c.groupby(by=sm_c.index, axis=0).mean().round(decimals=2)
 
-
-# In[940]:
-
-
 complete_mean.T
-
-
-# In[ ]:
-
-
-
-
